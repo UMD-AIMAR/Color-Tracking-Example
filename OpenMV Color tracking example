@@ -1,0 +1,112 @@
+# 351 testing - By: Nina Horne - Fri May 8 2020
+#everything with NINA at the beginning means I wrote / edited the line
+# Face Tracking Example - from OpenMV, edited by Nina
+# This example shows off using the keypoints feature of your OpenMV Cam to track
+# a face after it has been detected by a Haar Cascade. The first part of this
+# script finds a face in the image using the frontalface Haar Cascade.
+# After which the script uses the keypoints feature to automatically learn your
+# face and track it. Keypoints can be used to automatically track anything.
+#NINA imports all the libraries needed for all of the examples I'm using
+import sensor, time, image, math, pyb
+#NINA set up all of my pin outputs with g P0 as the green LED for same face detected & low
+#NINA for no face detected, r P1 red LED for different face detected. They are initially set to low.
+g = pyb.Pin("P0",pyb.Pin.OUT_PP)
+g.low()
+r = pyb.Pin("P1",pyb.Pin.OUT_PP)
+r.low()
+#NINA P6 is the analog DAC output which outputs the x coordinate, which controls the servo
+#NINA and x on the display. It is initially set to 0.
+dac = pyb.DAC(pyb.Pin('P6'))
+dac.write(0)
+# Reset sensor
+sensor.reset()
+sensor.set_contrast(3)
+sensor.set_gainceiling(16)
+#NINA these were part of the reset sensor for the original face tracking example, but
+#NINA have been commented out since they interfere with the color tracking example:
+#sensor.set_framesize(sensor.VGA)
+#sensor.set_windowing((320, 240))
+#sensor.set_pixformat(sensor.GRAYSCALE)
+#sensor.skip_frames(time = 2000)
+# Color Tracking Thresholds (L Min, L Max, A Min, A Max, B Min, B Max)
+# The below thresholds track in general red/green things. You may wish to tune them...
+thresholds = [(30, 100, 15, 127, 15, 127), # generic_red_thresholds -> index is 0 so code == (1 << 0)
+(30, 100, -64, -8, -32, 32)] # generic_green_thresholds -> index is 1 so code == (1 << 1)
+# Codes are or'ed together when "merge=True" for "find_blobs".
+sensor.set_pixformat(sensor.RGB565)
+sensor.set_framesize(sensor.QVGA)
+sensor.skip_frames(time = 2000)
+sensor.set_auto_gain(False) # must be turned off for color tracking
+sensor.set_auto_whitebal(False) # must be turned off for color tracking
+# Load Haar Cascade
+# By default this will use all stages, lower satges is faster but less accurate.
+face_cascade = image.HaarCascade("frontalface", stages=25)
+# print(face_cascade)
+# First set of keypoints
+kpts1 = None
+# Find a face!
+while (kpts1 == None):
+img = sensor.snapshot()
+img.draw_string(0, 0, "Looking for a face...")
+# Find faces
+objects = img.find_features(face_cascade, threshold=0.5, scale=1.25)
+if objects:
+# Expand the ROI by 31 pixels in every direction
+face = (objects[0][0]-31, objects[0][1]-31,objects[0][2]+31*2, objects[0][3]+31*2)
+# Extract keypoints using the detect face size as the ROI
+kpts1 = img.find_keypoints(threshold=10, scale_factor=1.1, max_keypoints=100, roi=face)
+# Draw a rectangle around the first face
+img.draw_rectangle(objects[0])
+# Draw keypoints
+print(kpts1)
+img.draw_keypoints(kpts1, size=24)
+img = sensor.snapshot()
+time.sleep(2000)
+# FPS clock
+clock = time.clock()
+while (True):
+clock.tick()
+img = sensor.snapshot()
+# Extract keypoints from the whole frame
+kpts2 = img.find_keypoints(threshold=10, scale_factor=1.1, max_keypoints=100, normalized=True)
+if (kpts2):
+# Match the first set of keypoints with the second one
+c=image.match_descriptor(kpts1, kpts2, threshold=85)
+match = c[6] # C[6] contains the number of matches.
+if (match>5):
+img.draw_rectangle(c[2:6])
+img.draw_cross(c[0], c[1], size=10)
+print(kpts2, "matched:%d dt:%d"%(match, c[7]))
+#NINA I added this so you can tell whether it is probably still the same face or not.
+#NINA len(kpts2) is the "size" which is typically higher is the keypoints match well.
+#NINA it activates the green LED if it is the same face
+if (len(kpts2) > 40 and c[7] < 30):
+print("STILL SAME FACE")
+g.high()
+#NINA this secction is the color tracking which prints out the xvalue of the green or red object
+# Draw FPS
+img.draw_string(0, 0, "FPS:%.2f"%(clock.fps()))
+img = sensor.snapshot()
+for blob in img.find_blobs(thresholds, pixels_threshold=100, area_threshold=100, merge=True):
+if blob.code() == 3: # r/g code == (1 << 1) | (1 << 0)
+# These values depend on the blob not being circular - otherwise they will be shaky.
+if blob.elongation() > 0.5:
+img.draw_edges(blob.min_corners(), color=(255,0,0))
+img.draw_line(blob.major_axis_line(), color=(0,255,0))
+img.draw_line(blob.minor_axis_line(), color=(0,0,255))
+# These values are stable all the time.
+img.draw_rectangle(blob.rect())
+img.draw_cross(blob.cx(), blob.cy())
+# Note - the blob rotation is unique to 0-180 only.
+img.draw_keypoints([(blob.cx(), blob.cy(), int(math.degrees(blob.rotation())))], size=20)
+#NINA print x value to screen and to P6
+print("X value=", int(blob.cx())//2)
+dac.write(int(blob.cx())//2)
+else:
+g.low()
+#NINA it activates the red LED if it may be someone else
+if (len(kpts2) < 40):
+print("Can't tell if this is you!!!!!!!!!")
+r.high()
+else:
+r.low()
