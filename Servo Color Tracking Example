@@ -1,0 +1,45 @@
+//Nina Horne 115307292
+//ENME351 Final Lab
+void setup() {
+Serial.begin(115200);
+//x of object (orange wires)
+pinMode(5, OUTPUT);
+pinMode(A0, INPUT);
+//green LED: same face detected (green wires)
+pinMode(2,OUTPUT);
+pinMode(13, INPUT);
+//red LED: unsure if it is the same face (yellow wires)
+pinMode(4,OUTPUT);
+pinMode(12,INPUT);
+}
+void loop() {
+//send signal from camera to the LEDs
+int green = digitalRead(13);
+digitalWrite(2,green);
+int red = digitalRead(12);
+digitalWrite(4,red);
+//define values for servo
+int tperiod = 20000;
+int xval = analogRead(A0);
+// convert from xval to servo control
+int tcontrol = map(xval,0, 416, 500, 2500);
+digitalWrite(5, HIGH);
+delayMicroseconds(tcontrol);
+digitalWrite(5, LOW);
+delayMicroseconds(tperiod - tcontrol);
+//convert from xval to angle
+int angle = map(xval, 0, 416, -500, 500);
+
+//Print values to processing
+Serial.println(String(green) + "\t" + String(red) + "\t" + String(angle));
+
+//Print to arduino monitor for testing commented out leaving only the values
+needed for processing
+//Serial.print("green LED:");
+// Serial.println(green);
+//Serial.print("redED:");
+// Serial.println(red);
+//Serial.print("t control= ");
+//Serial.println(tcontrol);
+//Serial.print("angle= ");
+// Serial.println(angle);
