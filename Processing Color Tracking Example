@@ -1,0 +1,52 @@
+Final_Lab
+int xval=256;
+int count =0;
+import processing.serial.*; // add the serial library
+Serial myPort; // the serial port to monitor
+void setup() {
+size(1200, 612); // set the window size
+println(Serial.list()); // list all available serial ports
+myPort = new Serial(this, Serial.list()[0], 115200); // define input port
+myPort.clear(); // clear the port of any initial junk
+background(125, 125, 125);
+}
+void draw () {
+while (myPort.available () > 0) { // make sure port is open
+String inString = myPort.readStringUntil(&apos;\n&apos;); // read input string
+if (inString != null) { // ignore null strings
+inString = trim(inString); // trim off any whitespace
+String[] xyzaRaw = splitTokens(inString, "\t"); // extract x & y into an array
+// proceed only if correct # of values extracted from the string:
+if (xyzaRaw.length == 3) {
+int green = int(xyzaRaw[0]);
+int red = int(xyzaRaw[1]);
+int xval = int(xyzaRaw[2]);
+int x = int((float)xval*(512.0/1024.0));
+if(green>0){
+textSize(30);
+fill(0, 200, 0);
+text("Same face detected!", 180, 80);
+println("xval=", xval);
+fill(10, 200, 0); // pick the fill color (r,g,b)
+ellipse(400+x, 256, 40, 40); // draw a circle
+count = count +1;
+if(count >20){
+
+background(125, 125, 125);
+count=0;
+}
+}
+if(red>0){
+textSize(30);
+fill(200, 0, 0);
+text("Can&apos;t tell if this is you!", 180, 80);
+count = count +1;
+if(count >5){
+background(125, 125, 125);
+count=0;
+}
+}
+}
+}
+}
+}
